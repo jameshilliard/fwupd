@@ -29,7 +29,6 @@ gboolean
 fu_thunderbolt_udev_set_port_offline(FuUdevDevice *device, GError **error)
 {
 	const gchar *offline = "usb4_port1/offline";
-	const gchar *rescan = "usb4_port1/rescan";
 	g_autoptr(GError) error_local = NULL;
 
 	if (!fu_thunderbolt_device_check_usb4_port_path(device, offline, &error_local)) {
@@ -40,6 +39,15 @@ fu_thunderbolt_udev_set_port_offline(FuUdevDevice *device, GError **error)
 		g_prefix_error(error, "setting usb4 port offline failed: ");
 		return FALSE;
 	}
+	return TRUE;
+}
+
+gboolean
+fu_thunderbolt_udev_rescan_port(FuUdevDevice *device, GError **error)
+{
+	const gchar *rescan = "usb4_port1/rescan";
+	g_autoptr(GError) error_local = NULL;
+
 	if (!fu_thunderbolt_device_check_usb4_port_path(device, rescan, &error_local)) {
 		g_debug("failed to check usb4 rescan path: %s", error_local->message);
 		return TRUE;

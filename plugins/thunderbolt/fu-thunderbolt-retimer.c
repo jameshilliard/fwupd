@@ -85,6 +85,19 @@ fu_thunderbolt_retimer_probe(FuDevice *device, GError **error)
 }
 
 static gboolean
+fu_thunderbolt_retimer_reload(FuDevice *device, GError **error)
+{
+	/* get version */
+	if (!fu_thunderbolt_udev_rescan_port(FU_UDEV_DEVICE(device), error))
+		return FALSE;
+	if (!fu_thunderbolt_device_get_version(FU_THUNDERBOLT_DEVICE(device), error))
+		return FALSE;
+
+	/* success */
+	return TRUE;
+}
+
+static gboolean
 fu_thunderbolt_retimer_setup(FuDevice *device, GError **error)
 {
 	FuThunderboltRetimer *self = FU_THUNDERBOLT_RETIMER(device);
@@ -150,5 +163,6 @@ fu_thunderbolt_retimer_class_init(FuThunderboltRetimerClass *klass)
 {
 	FuDeviceClass *device_class = FU_DEVICE_CLASS(klass);
 	device_class->setup = fu_thunderbolt_retimer_setup;
+	device_class->reload = fu_thunderbolt_retimer_reload;
 	device_class->probe = fu_thunderbolt_retimer_probe;
 }
