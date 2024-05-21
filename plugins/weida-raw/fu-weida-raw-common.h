@@ -8,6 +8,5 @@
 
 #include <glib-object.h>
 
-
 gboolean
 fu_weida_raw_block_is_empty(const guint8 *data, gsize datasz);

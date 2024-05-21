@@ -8,12 +8,11 @@
 
 #include "fu-weida-raw-common.h"
 
-
 gboolean
 fu_weida_raw_block_is_empty(const guint8 *data, gsize datasz)
 {
 	for (gsize i = 0; i < datasz; i++) {
-		if (data[i] != 0xff)
+		if (data[i] != 0xFF)
 			return FALSE;
 	}
 	return TRUE;

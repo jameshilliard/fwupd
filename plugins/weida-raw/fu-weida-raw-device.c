@@ -44,14 +44,6 @@ typedef struct {
 	guint8 *bin;
 } FuWeidaSpiBinary;
 
-
-#define FU_WEIDA_RAW_FW_NOT_SUPPORT 0x00
-#define FU_WEIDA_RAW_FW_MAYBE_ISP   0x01
-#define FU_WEIDA_RAW_FW8755	    0x02
-#define FU_WEIDA_RAW_FW8760	    0x04
-#define FU_WEIDA_RAW_FW8762	    0x08
-#define FU_WEIDA_RAW_FW8790	    0X10
-
 struct _FuWeidaRawDevice {
 	FuUdevDevice parent_instance;
 	gint32 dev_type;
@@ -62,6 +54,13 @@ struct _FuWeidaRawDevice {
 };
 
 G_DEFINE_TYPE(FuWeidaRawDevice, fu_weida_raw_device, FU_TYPE_UDEV_DEVICE)
+
+#define FU_WEIDA_RAW_FW_NOT_SUPPORT 0x00
+#define FU_WEIDA_RAW_FW_MAYBE_ISP   0x01
+#define FU_WEIDA_RAW_FW8755	    0x02
+#define FU_WEIDA_RAW_FW8760	    0x04
+#define FU_WEIDA_RAW_FW8762	    0x08
+#define FU_WEIDA_RAW_FW8790	    0X10
 
 static gboolean
 fu_weida_raw_device_set_feature(FuWeidaRawDevice *self,
@@ -76,7 +75,6 @@ fu_weida_raw_device_set_feature(FuWeidaRawDevice *self,
 				    NULL,
 				    FU_WEIDA_RAW_DEVICE_IOCTL_TIMEOUT,
 				    error);
-
 	return TRUE;
 }
 
@@ -91,7 +89,6 @@ fu_weida_raw_device_get_feature(FuWeidaRawDevice *self, guint8 *data, guint data
 				  error))
 		return FALSE;
 	fu_dump_raw(G_LOG_DOMAIN, "GetFeature", data, datasz);
-
 	return TRUE;
 }
 
@@ -103,8 +100,6 @@ fu_weida_raw_device_to_string(FuDevice *device, guint idt, GString *str)
 	fwupd_codec_string_append_hex(str, idt, "FirmwareId", self->firmware_id);
 	fwupd_codec_string_append_hex(str, idt, "HardwareId", self->hardware_id);
 	fwupd_codec_string_append_hex(str, idt, "FirmwareRevExt", self->firmware_rev_ext);
-
-	return;
 }
 
 static gboolean
@@ -169,6 +164,8 @@ static gboolean
 fu_weida_raw_device_ensure_status(FuWeidaRawDevice *self, GError **error)
 {
 	guint8 buf[] = {[0] = FU_WEIDA_RAW_REQ_DEV_INFO, [1 ... 63] = 0xff};
+	g_autofree gchar *serial = NULL;
+	g_autofree gchar *version = NULL;
 
 	if (!fu_weida_raw_device_get_feature(self, buf, sizeof(buf), error))
 		return FALSE;
@@ -176,9 +173,8 @@ fu_weida_raw_device_ensure_status(FuWeidaRawDevice *self, GError **error)
 	self->hardware_id = fu_memread_uint32(&buf[5], G_LITTLE_ENDIAN);
 	self->serial_number = fu_memread_uint32(&buf[9], G_LITTLE_ENDIAN);
 	fu_weida_raw_check_firmware_id(self, self->firmware_id);
-	if (self->firmware_id == 0) {
+	if (self->firmware_id == 0)
 		self->dev_type = self->dev_type | FU_WEIDA_RAW_FW_MAYBE_ISP;
-	}
 	self->firmware_rev_ext = 0;
 	if (self->dev_type == FU_WEIDA_RAW_FW8760)
 		self->firmware_rev_ext = buf[33];
@@ -186,18 +182,17 @@ fu_weida_raw_device_ensure_status(FuWeidaRawDevice *self, GError **error)
 		self->firmware_rev_ext = buf[14];
 
 	if (self->dev_type == FU_WEIDA_RAW_FW8755) {
-		fu_device_set_version(
-		    FU_DEVICE(self),
-		    fu_version_from_uint16(self->firmware_id, FWUPD_VERSION_FORMAT_HEX));
+		version = fu_version_from_uint16(self->firmware_id, FWUPD_VERSION_FORMAT_HEX);
 	} else {
-		fu_device_set_version(FU_DEVICE(self),
-				      fu_version_from_uint16(((self->firmware_id & 0x0FFF) << 4) |
-								 (self->firmware_rev_ext & 0x000F),
-							     FWUPD_VERSION_FORMAT_HEX));
+		version = fu_version_from_uint16(((self->firmware_id & 0x0FFF) << 4) |
+						     (self->firmware_rev_ext & 0x000F),
+						 FWUPD_VERSION_FORMAT_HEX);
 	}
-	fu_device_set_serial(FU_DEVICE(self),
-			     fu_version_from_uint32(self->serial_number, FWUPD_VERSION_FORMAT_HEX));
+	fu_device_set_version(FU_DEVICE(self), version);
+	serial = fu_version_from_uint32(self->serial_number, FWUPD_VERSION_FORMAT_HEX);
+	fu_device_set_serial(FU_DEVICE(self), serial);
 
+	/* success */
 	return TRUE;
 }
 
@@ -205,7 +200,6 @@ static gboolean
 fu_weida_raw_device_setup(FuDevice *device, GError **error)
 {
 	FuWeidaRawDevice *self = FU_WEIDA_RAW_DEVICE(device);
-	g_debug("weida_raw_setup");
 
 	if (!fu_weida_raw_device_ensure_status(self, error))
 		return FALSE;
@@ -227,11 +221,11 @@ fu_weida_raw_w8760_command_write(FuWeidaRawDevice *self,
 static gboolean
 fu_weida_raw_w8760_set_device_mode(FuWeidaRawDevice *self, guint8 mode, GError **error)
 {
-	guint8 cmd[10] = {0};
-
-	cmd[0] = FU_WEIDA_RAW_CMD8760_COMMAND9;
-	cmd[1] = FU_WEIDA_RAW_CMD8760_SET_DEVICE_MODE;
-	cmd[2] = mode;
+	guint8 cmd[10] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND9,
+	    FU_WEIDA_RAW_CMD8760_SET_DEVICE_MODE,
+	    mode,
+	};
 	return fu_weida_raw_w8760_command_write(self, cmd, 0, 10, error);
 }
 
@@ -274,21 +268,20 @@ fu_weida_raw_w8760_get_status(FuWeidaRawDevice *self,
 			      guint8 size,
 			      GError **error)
 {
-	guint8 cmd[10] = {0};
-	cmd[0] = FU_WEIDA_RAW_CMD8760_COMMAND9;
-	cmd[1] = FU_WEIDA_RAW_CMD8760_GET_DEVICE_STATUS;
-	cmd[2] = offset;
-	cmd[3] = size;
-
+	guint8 cmd[10] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND9,
+	    FU_WEIDA_RAW_CMD8760_GET_DEVICE_STATUS,
+	    offset,
+	    size,
+	};
 	return fu_weida_raw_w8760_command_read(self, cmd, sizeof(cmd), buf, 0, 10, error);
 }
 
+// XXX
 static guint8
 fu_weida_raw_w8760_get_device_mode(FuWeidaRawDevice *self, GError **error)
 {
 	guint8 status[10] = {0};
-	if (!self)
-		return 0;
 
 	if (fu_weida_raw_w8760_get_status(self, status, 4, 1, error)) {
 		g_debug("status = %d", status[0]);
@@ -302,16 +295,14 @@ static gboolean
 fu_weida_raw_w8760_protect_flash(FuWeidaRawDevice *self, guint16 protect_mask, GError **error)
 {
 	guint16 mask = protect_mask;
-
-	guint8 cmd[10] =
-	    {FU_WEIDA_RAW_CMD8760_COMMAND9, FU_WEIDA_RAW_CMD8760_PROTECT_FLASH, 0, 0, 0, 0, 0};
+	guint8 cmd[10] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND9,
+	    FU_WEIDA_RAW_CMD8760_PROTECT_FLASH,
+	};
 	fu_memwrite_uint16(&cmd[2], mask, G_LITTLE_ENDIAN);
 	fu_memwrite_uint16(&cmd[4], ~mask, G_LITTLE_ENDIAN);
 
-	if (!fu_weida_raw_device_set_feature(self, cmd, sizeof(cmd), error))
-		return FALSE;
-	else
-		return TRUE;
+	return fu_weida_raw_device_set_feature(self, cmd, sizeof(cmd), error);
 }
 
 typedef struct {
@@ -328,11 +319,13 @@ fu_weida_w8760_set_n_check_device_mode_cb(FuDevice *device, gpointer user_data, 
 		fu_device_sleep(device, 30);
 		if (fu_weida_raw_w8760_get_device_mode(self, error) == req->cmd)
 			return TRUE;
-		else
+		else {
 			g_set_error(error,
 				    FWUPD_ERROR,
 				    FWUPD_ERROR_INVALID_DATA,
 				    "The device is not ready yet");
+			return FALSE;
+		}
 	}
 
 	return FALSE;
@@ -364,17 +357,15 @@ fu_weida_raw_w8760_erase_flash(FuWeidaRawDevice *self,
 			       guint32 size,
 			       GError **error)
 {
-	guint8 cmd[10] = {0};
+	guint8 cmd[10] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND9,
+	    FU_WEIDA_RAW_CMD8760_ERASE_FLASH,
+	    (guint8)(address >> 12),
+	    (guint8)(((address & 0x0FFF) + size + 4095) >> 12),
+	};
 
-	cmd[0] = FU_WEIDA_RAW_CMD8760_COMMAND9;
-	cmd[1] = FU_WEIDA_RAW_CMD8760_ERASE_FLASH;
-	cmd[2] = (guint8)(address >> 12);
-	cmd[3] = (guint8)(((address & 0x0FFF) + size + 4095) >> 12);
-
-	if (!fu_weida_raw_device_set_feature(self, cmd, sizeof(cmd), error)) {
+	if (!fu_weida_raw_device_set_feature(self, cmd, sizeof(cmd), error))
 		return FALSE;
-	}
-
 	if (!fu_device_retry_full(FU_DEVICE(self),
 				  fu_weida_w8760_wait_cmd_end_cb,
 				  200,
@@ -391,11 +382,11 @@ fu_weida_raw_w8760_erase_flash(FuWeidaRawDevice *self,
 static gboolean
 fu_weida_raw_w8760_set_flash_address(FuWeidaRawDevice *self, guint32 address, GError **error)
 {
-	guint8 cmd[10] = {0};
-	cmd[0] = FU_WEIDA_RAW_CMD8760_COMMAND9;
-	cmd[1] = FU_WEIDA_RAW_CMD8760_SET_FLASH_ADDRESS;
+	guint8 cmd[10] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND9,
+	    FU_WEIDA_RAW_CMD8760_SET_FLASH_ADDRESS,
+	};
 	fu_memwrite_uint32(&cmd[2], address, G_LITTLE_ENDIAN);
-
 	return fu_weida_raw_w8760_command_write(self, cmd, 0, 10, error);
 }
 
@@ -406,16 +397,17 @@ fu_weida_raw_w8760_batch_write_flash(FuWeidaRawDevice *self,
 				     guint8 size,
 				     GError **error)
 {
-	guint8 cmd[FU_WEIDA_RAW_USB_MAX_PAYLOAD_SIZE + 1] = {0};
+	guint8 cmd[FU_WEIDA_RAW_USB_MAX_PAYLOAD_SIZE + 1] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND63,
+	    FU_WEIDA_RAW_CMD8760_WRITE_FLASH,
+	    size,
+	};
 
+	// XXX
 	if (size > FU_WEIDA_RAW_USB_MAX_PAYLOAD_SIZE - 2) {
 		g_debug("%s: payload data overrun\n", __func__);
 		return FALSE;
 	}
-
-	cmd[0] = FU_WEIDA_RAW_CMD8760_COMMAND63;
-	cmd[1] = FU_WEIDA_RAW_CMD8760_WRITE_FLASH;
-	cmd[2] = (guint8)size;
 	memcpy(&cmd[3], &buf[start], size);
 
 	if (fu_weida_raw_w8760_command_write(self, cmd, 0, size + 3, error) > 0) {
@@ -440,10 +432,14 @@ fu_weida_raw_w8760_read_items(FuWeidaRawDevice *self,
 			      guint8 item_count,
 			      GError **error)
 {
-	int size = item_size * item_count;
 	guint8 cmd[] = {FU_WEIDA_RAW_CMD8760_COMMAND9, cmd_id, item_count};
-
-	return fu_weida_raw_w8760_command_read(self, cmd, 2, buffer, start, size, error);
+	return fu_weida_raw_w8760_command_read(self,
+					       cmd,
+					       2,
+					       buffer,
+					       start,
+					       item_size * item_count,
+					       error);
 }
 
 static gboolean
@@ -466,11 +462,12 @@ fu_weida_raw_w8760_checksum_flash(FuWeidaRawDevice *self,
 				  guint16 init_sum,
 				  GError **error)
 {
-	guint8 cmd[10];
-	guint8 buf[4];
+	guint8 cmd[10] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND9,
+	    FU_WEIDA_RAW_CMD8760_CALCULATE_FLASH_CHECKSUM,
+	};
+	guint8 buf[4] = {0};
 
-	cmd[0] = FU_WEIDA_RAW_CMD8760_COMMAND9;
-	cmd[1] = FU_WEIDA_RAW_CMD8760_CALCULATE_FLASH_CHECKSUM;
 	fu_memwrite_uint32(&cmd[2], flash_address, G_LITTLE_ENDIAN);
 	fu_memwrite_uint32(&cmd[5], size, G_LITTLE_ENDIAN);
 	fu_memwrite_uint16(&cmd[8], init_sum, G_LITTLE_ENDIAN);
@@ -534,6 +531,7 @@ fu_weida_raw_w8760_write_flash(FuWeidaRawDevice *self,
 	if (byte_count > 0)
 		return fu_weida_raw_w8760_batch_write_flash(self, buf, offset, byte_count, error);
 
+	/* success */
 	return TRUE;
 }
 
@@ -595,11 +593,15 @@ fu_weida_raw_w8760_flash_write_data(FuWeidaRawDevice *pdev,
 				    guint32 length,
 				    GError **error)
 {
-	if (!pdev || !data)
-		return FALSE;
+	g_return_val_if_fail(data != NULL, FALSE);
 
-	if ((address & 0x3) != 0)
+	if ((address & 0x3) != 0) {
+		g_set_error_literal(error,
+				    FWUPD_ERROR,
+				    FWUPD_ERROR_NOT_SUPPORTED,
+				    "address alignment bad");
 		return FALSE;
+	}
 
 	if (!fu_weida_raw_w8760_set_flash_address(pdev, address, error))
 		return FALSE;
@@ -610,9 +612,14 @@ fu_weida_raw_w8760_flash_write_data(FuWeidaRawDevice *pdev,
 static gboolean
 fu_weida_raw_w8760_dev_reboot(FuWeidaRawDevice *pdev, GError **error)
 {
-	guint8 cmd[] =
-	    {FU_WEIDA_RAW_CMD8760_COMMAND9, FU_WEIDA_RAW_CMD8760_REBOOT, 0xB9, 0x0C, 0x8A, 0x24};
-
+	guint8 cmd[] = {
+	    FU_WEIDA_RAW_CMD8760_COMMAND9,
+	    FU_WEIDA_RAW_CMD8760_REBOOT,
+	    0xB9,
+	    0x0C,
+	    0x8A,
+	    0x24,
+	};
 	return fu_weida_raw_w8760_command_write(pdev, cmd, 0, sizeof(cmd), error);
 }
 
@@ -686,8 +693,6 @@ fu_wdt_hid_device_rebind_driver(FuWeidaRawDevice *self, GError **error)
 		return FALSE;
 	}
 
-	g_debug("HID_PHYS: %s", hid_id);
-
 	driver = g_udev_device_get_driver(parent_phys);
 	subsystem = g_udev_device_get_subsystem(parent_phys);
 	fn_rebind = g_build_filename("/sys/bus/", subsystem, "drivers", driver, "bind", NULL);
@@ -715,7 +720,7 @@ fu_weida_raw_w8760_write_spi_bin(FuWeidaRawDevice *pdev, FuWeidaSpiBinary spi_bi
 	guint16 read_checksum;
 
 	if (!fu_weida_raw_w8760_erase_flash(pdev, spi_bin.address, spi_bin.size, error)) {
-		g_debug("ERASE FLASH FAIL\n");
+		g_prefix_error(error, "erase flash failed: ");
 		return FALSE;
 	}
 
@@ -746,11 +751,10 @@ fu_weida_raw_w8760_write_spi_bin(FuWeidaRawDevice *pdev, FuWeidaSpiBinary spi_bi
 							  error);
 			if (read_checksum == calc_checksum)
 				break;
-			else
-				g_debug("checksum failed (%d): %d <> %d\n",
-					retry_count,
-					read_checksum,
-					calc_checksum);
+			g_debug("checksum failed (%d): %d <> %d\n",
+				retry_count,
+				read_checksum,
+				calc_checksum);
 		}
 		if (retry_count == FU_WEIDA_RAW_RETRY_COUNT) {
 			g_debug("retry fail %s", __func__);
@@ -775,7 +779,6 @@ fu_weida_raw_w8760_wif_chunk_write(FuWeidaRawDevice *self,
 	gboolean ret = TRUE;
 	gsize offset = start;
 	FuWeidaRawDeviceReq req = {.cmd = FU_WEIDA_RAW_CMD8760_MODE_FLASH_PROGRAM};
-	g_debug("%s\n", __func__);
 
 	if (!fu_device_retry(FU_DEVICE(self),
 			     fu_weida_w8760_set_n_check_device_mode_cb,
@@ -786,11 +789,10 @@ fu_weida_raw_w8760_wif_chunk_write(FuWeidaRawDevice *self,
 		return FALSE;
 	}
 
-
 	if (!fu_weida_raw_w8760_protect_flash(self,
 					      FU_WEIDA_RAW_CMD8760U16_UNPROTECT_LOWER508K,
 					      error)) {
-		g_debug("W8760_UnprotectLower508k fail\n");
+		g_prefix_error(error, "W8760_UnprotectLower508k failed: ");
 		return FALSE;
 	}
 
@@ -853,7 +855,8 @@ fu_weida_raw_w8760_wif_chunk_write(FuWeidaRawDevice *self,
 		}
 	}
 	if (!fu_weida_raw_w8760_protect_flash(self, FU_WEIDA_RAW_CMD8760U16_PROTECT_ALL, error)) {
-		g_debug("protect all fail\n");
+		g_prefix_error(error, "protect all failed: ");
+		return FALSE;
 	}
 	return ret;
 }
@@ -955,9 +958,7 @@ fu_weida_raw_device_write_firmware(FuDevice *device,
 	fu_progress_add_step(progress, FWUPD_STATUS_DEVICE_WRITE, 44, NULL);
 	fu_progress_add_step(progress, FWUPD_STATUS_DEVICE_VERIFY, 35, NULL);
 
-
 	/* write each block */
-
 	blob = fu_firmware_get_bytes(firmware, error);
 	if (blob == NULL)
 		return FALSE;
@@ -968,14 +969,17 @@ fu_weida_raw_device_write_firmware(FuDevice *device,
 	buf = g_bytes_get_data(blob, &test_size);
 
 	if (self->dev_type == FU_WEIDA_RAW_FW8760) {
-		g_debug("It is w8760 device");
 		fu_weida_raw_w8760_write_wif1(self, buf, test_size, error);
 		fu_weida_raw_w8760_dev_reboot(self, error);
 	} else {
+		g_set_error(error,
+			    FWUPD_ERROR,
+			    FWUPD_ERROR_NOT_SUPPORTED,
+			    "device type 0x%x not supported",
+			    (guint)self->dev_type);
 		return FALSE;
 	}
-
-	g_usleep(2 * 1000 * 1000);
+	fu_device_sleep(device, 2 * 1000);
 
 	if (!fu_device_has_flag(FU_DEVICE(self), FWUPD_DEVICE_FLAG_INTERNAL)) {
 		fu_device_set_remove_delay(FU_DEVICE(self), FU_DEVICE_REMOVE_DELAY_RE_ENUMERATE);
@@ -1021,8 +1025,6 @@ fu_weida_raw_device_set_progress(FuDevice *self, FuProgress *progress)
 static void
 fu_weida_raw_device_init(FuWeidaRawDevice *self)
 {
-	const gchar *i2c_id;
-	const gchar *back_id;
 	fu_device_set_version_format(FU_DEVICE(self), FWUPD_VERSION_FORMAT_HEX);
 	fu_device_set_remove_delay(FU_DEVICE(self), FU_DEVICE_REMOVE_DELAY_RE_ENUMERATE);
 	fu_device_add_protocol(FU_DEVICE(self), "com.weida.raw");
@@ -1035,9 +1037,10 @@ fu_weida_raw_device_init(FuWeidaRawDevice *self)
 
 	fu_device_add_flag(FU_DEVICE(self), FWUPD_DEVICE_FLAG_REQUIRE_AC);
 	if (FU_DEVICE(self) != NULL) {
-		back_id = fu_device_get_backend_id(FU_DEVICE(self));
+		const gchar *back_id = fu_device_get_backend_id(FU_DEVICE(self));
 		if (back_id != NULL) {
-			i2c_id = g_strrstr(fu_device_get_backend_id(FU_DEVICE(self)), "i2c");
+			const gchar *i2c_id =
+			    g_strrstr(fu_device_get_backend_id(FU_DEVICE(self)), "i2c");
 			if (i2c_id != NULL)
 				fu_device_add_flag(FU_DEVICE(self), FWUPD_DEVICE_FLAG_INTERNAL);
 		}

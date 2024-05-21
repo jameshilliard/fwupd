@@ -23,7 +23,8 @@ These devices use the standard TODO DeviceInstanceId values, e.g.
 
 ## Update Behavior
 
-The firmware is written to the device by switching to a flash program mode where the touchscreen is nonfunctional, and the device will reset when the new firmware has been programmed.
+The firmware is written to the device by switching to a flash program mode where the touchscreen
+is nonfunctional, and the device will reset when the new firmware has been programmed.
 
 ## Vendor ID Security
 

@@ -3,16 +3,16 @@
 
 #[repr(u32le)]
 enum FuWeidaRawFirmwareFourcc {
-    RIFF = 0x46464952,
-    WIF2 = 0x32464957,
-    WHIF = 0x46494857,
-    INFO = 0x4f464e49,
-    FSUM = 0x4d555346,
-    FERA = 0x41524546,
-    FBIN = 0x4e494246,
-    FRMT = 0x544D5246,
-    FRWR = 0x52575246,
-    CNFG = 0x47464E43,
+    Riff = 0x46464952,
+    Wif2 = 0x32464957,
+    Whif = 0x46494857,
+    Info = 0x4f464e49,
+    Fsum = 0x4d555346,
+    Fera = 0x41524546,
+    Fbin = 0x4e494246,
+    Frmt = 0x544D5246,
+    Frwr = 0x52575246,
+    Cnfg = 0x47464E43,
 }
 
 #[repr(u8)]
@@ -37,4 +37,3 @@ enum FuWeidaRawCmd8760u16 {
     UnprotectLower508k = 0x0044,
     ProtectAll = 0x007C,
 }
-
