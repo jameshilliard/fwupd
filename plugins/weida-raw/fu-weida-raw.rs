@@ -37,3 +37,25 @@ enum FuWeidaRawCmd8760u16 {
     UnprotectLower508k = 0x0044,
     ProtectAll = 0x007C,
 }
+
+#[derive(ParseStream)]
+struct FuWeidaRiffHeader {
+    fourcc: FuWeidaRawFirmwareFourcc == Riff,
+    file_size: u32,
+    data_type: FuWeidaRawFirmwareFourcc == Whif,
+}
+
+#[derive(ParseStream)]
+struct FuWeidaChunkHeader {
+    fourcc: FuWeidaRawFirmwareFourcc == Frmt,
+    size: u32, // of payload
+}
+
+#[derive(ParseStream)]
+struct FuWeidaChunkWif {
+    fourcc: FuWeidaRawFirmwareFourcc,
+    size: u32,
+    address: u32,
+    spi_size: u32,
+    reserved: [u32; 4],
+}
