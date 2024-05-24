@@ -797,6 +797,7 @@ fu_weida_raw_w8760_wif_chunk_write(FuWeidaRawDevice *self,
 		g_autoptr(GInputStream) partial_stream = NULL;
 
 		st_wif = fu_weida_chunk_wif_parse_stream(stream, offset, error);
+		g_message("offset= %d \n", offset);
 		if (st_wif == NULL)
 			return FALSE;
 		if (fu_weida_chunk_wif_get_fourcc(st_wif) != FU_WEIDA_RAW_FIRMWARE_FOURCC_FRWR &&
@@ -838,11 +839,13 @@ fu_weida_raw_w8760_write_wif1(FuWeidaRawDevice *self, GInputStream *stream, GErr
 	if (st_he == NULL)
 		return FALSE;
 	offset += FU_WEIDA_RIFF_HEADER_SIZE;
+	g_message("offset= %d \n", offset);
 
 	st_hed1 = fu_weida_chunk_header_parse_stream(stream, offset, error);
 	if (st_hed1 == NULL)
 		return FALSE;
-	offset += fu_weida_chunk_header_get_size(st_hed1) - sizeof(guint32);
+	offset += fu_weida_chunk_header_get_size(st_hed1);
+	g_message("offset= %d \n", offset);
 
 	if (!fu_weida_raw_w8760_wif_chunk_write(self, stream, offset, error))
 		return FALSE;
