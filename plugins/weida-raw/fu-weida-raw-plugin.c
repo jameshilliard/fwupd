@@ -7,6 +7,7 @@
 #include "config.h"
 
 #include "fu-weida-raw-device.h"
+#include "fu-weida-raw-firmware.h"
 #include "fu-weida-raw-plugin.h"
 
 struct _FuWeidaRawPlugin {
@@ -25,6 +26,7 @@ fu_weida_raw_plugin_constructed(GObject *obj)
 {
 	FuPlugin *plugin = FU_PLUGIN(obj);
 	fu_plugin_add_device_gtype(plugin, FU_TYPE_WEIDA_RAW_DEVICE);
+	fu_plugin_add_firmware_gtype(plugin, NULL, FU_TYPE_WEIDA_RAW_FIRMWARE);
 }
 
 static void

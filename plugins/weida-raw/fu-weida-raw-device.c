@@ -12,8 +12,8 @@
 
 #include "fu-weida-raw-common.h"
 #include "fu-weida-raw-device.h"
+#include "fu-weida-raw-firmware.h"
 #include "fu-weida-raw-struct.h"
-
 
 #define FU_WEIDA_RAW_DEVICE_IOCTL_TIMEOUT 5000 /* ms */
 #define FU_WEIDA_RAW_REQ_DEV_INFO	  0xF2
@@ -765,13 +765,20 @@ fu_weida_raw_w8760_write_chunk(FuWeidaRawDevice *self,
 }
 
 static gboolean
-fu_weida_raw_w8760_wif_chunk_write(FuWeidaRawDevice *self,
-				   GInputStream *stream,
-				   gsize offset,
-				   GError **error)
+fu_weida_raw_w8760_write_wif1(FuWeidaRawDevice *self,
+			      FuFirmware *firmware,
+			      FuProgress *progress,
+			      GError **error)
 {
-	gsize bufsz = 0;
 	FuWeidaRawDeviceReq req = {.cmd = FU_WEIDA_RAW_CMD8760_MODE_FLASH_PROGRAM};
+	g_autoptr(GPtrArray) imgs = fu_firmware_get_images(firmware);
+
+	/* progress */
+	fu_progress_set_id(progress, G_STRLOC);
+	fu_progress_add_flag(progress, FU_PROGRESS_FLAG_GUESSED);
+	fu_progress_add_step(progress, FWUPD_STATUS_DEVICE_WRITE, 33, NULL);
+	fu_progress_add_step(progress, FWUPD_STATUS_DEVICE_WRITE, 35, NULL);
+	fu_progress_add_step(progress, FWUPD_STATUS_DEVICE_WRITE, 35, NULL);
 
 	if (!fu_device_retry(FU_DEVICE(self),
 			     fu_weida_w8760_set_n_check_device_mode_cb,
@@ -781,6 +788,7 @@ fu_weida_raw_w8760_wif_chunk_write(FuWeidaRawDevice *self,
 		g_prefix_error(error, "failed to set device to flash program mode ");
 		return FALSE;
 	}
+	fu_progress_step_done(progress);
 
 	if (!fu_weida_raw_w8760_protect_flash(self,
 					      FU_WEIDA_RAW_CMD8760U16_UNPROTECT_LOWER508K,
@@ -788,67 +796,19 @@ fu_weida_raw_w8760_wif_chunk_write(FuWeidaRawDevice *self,
 		g_prefix_error(error, "W8760_UnprotectLower508k failed: ");
 		return FALSE;
 	}
+	fu_progress_step_done(progress);
 
-	// FIXME: should we create a partial stream based on the payload length?
-	if (!fu_input_stream_size(stream, &bufsz, error))
-		return FALSE;
-	while (offset < bufsz) {
-		g_autoptr(FuWeidaChunkWif) st_wif = NULL;
-		g_autoptr(GInputStream) partial_stream = NULL;
+	for (guint i = 0; i < imgs->len; i++) {
+		FuFirmware *img = g_ptr_array_index(imgs, i);
+		g_autoptr(GInputStream) stream = NULL;
 
-		st_wif = fu_weida_chunk_wif_parse_stream(stream, offset, error);
-		g_message("offset= %d \n", offset);
-		if (st_wif == NULL)
+		stream = fu_firmware_get_stream(img, error);
+		if (stream == NULL)
 			return FALSE;
-		if (fu_weida_chunk_wif_get_fourcc(st_wif) != FU_WEIDA_RAW_FIRMWARE_FOURCC_FRWR &&
-		    fu_weida_chunk_wif_get_fourcc(st_wif) != FU_WEIDA_RAW_FIRMWARE_FOURCC_CNFG) {
-			g_set_error_literal(error,
-					    FWUPD_ERROR,
-					    FWUPD_ERROR_NOT_SUPPORTED,
-					    "not FRWR or CNFG");
+		if (!fu_weida_raw_w8760_write_chunk(self, fu_firmware_get_addr(img), stream, error))
 			return FALSE;
-		}
-		offset += FU_WEIDA_CHUNK_WIF_SIZE;
-
-		partial_stream = fu_partial_input_stream_new(stream,
-							     offset,
-							     fu_weida_chunk_wif_get_size(st_wif),
-							     error);
-		if (partial_stream == NULL)
-			return FALSE;
-		if (!fu_weida_raw_w8760_write_chunk(self,
-						    fu_weida_chunk_wif_get_address(st_wif),
-						    partial_stream,
-						    error))
-			return FALSE;
-
-		offset += fu_weida_chunk_wif_get_spi_size(st_wif);
 	}
-
-	return TRUE;
-}
-
-static gboolean
-fu_weida_raw_w8760_write_wif1(FuWeidaRawDevice *self, GInputStream *stream, GError **error)
-{
-	gsize offset = 0;
-	g_autoptr(FuWeidaRiffHeader) st_he = NULL;
-	g_autoptr(FuWeidaChunkHeader) st_hed1 = NULL;
-
-	st_he = fu_weida_riff_header_parse_stream(stream, offset, error);
-	if (st_he == NULL)
-		return FALSE;
-	offset += FU_WEIDA_RIFF_HEADER_SIZE;
-	g_message("offset= %d \n", offset);
-
-	st_hed1 = fu_weida_chunk_header_parse_stream(stream, offset, error);
-	if (st_hed1 == NULL)
-		return FALSE;
-	offset += fu_weida_chunk_header_get_size(st_hed1);
-	g_message("offset= %d \n", offset);
-
-	if (!fu_weida_raw_w8760_wif_chunk_write(self, stream, offset, error))
-		return FALSE;
+	fu_progress_step_done(progress);
 
 	/* success */
 	return TRUE;
@@ -888,8 +848,16 @@ fu_weida_raw_device_write_firmware(FuDevice *device,
 				   GError **error)
 {
 	FuWeidaRawDevice *self = FU_WEIDA_RAW_DEVICE(device);
-	g_autoptr(GInputStream) stream = NULL;
-	//	g_autoptr(FuChunkArray) chunks = NULL;
+
+	/* sanity check */
+	if (self->dev_type != FU_WEIDA_RAW_FW8760) {
+		g_set_error(error,
+			    FWUPD_ERROR,
+			    FWUPD_ERROR_NOT_SUPPORTED,
+			    "device type 0x%x not supported",
+			    (guint)self->dev_type);
+		return FALSE;
+	}
 
 	/* progress */
 	fu_progress_set_id(progress, G_STRLOC);
@@ -898,22 +866,12 @@ fu_weida_raw_device_write_firmware(FuDevice *device,
 	fu_progress_add_step(progress, FWUPD_STATUS_DEVICE_VERIFY, 35, NULL);
 
 	/* get default image */
-	stream = fu_firmware_get_stream(firmware, error);
-	if (stream == NULL)
+	if (!fu_weida_raw_w8760_write_wif1(self, firmware, fu_progress_get_child(progress), error))
 		return FALSE;
-	if (self->dev_type == FU_WEIDA_RAW_FW8760) {
-		if (!fu_weida_raw_w8760_write_wif1(self, stream, error))
-			return FALSE;
-		if (!fu_weida_raw_w8760_dev_reboot(self, error))
-			return FALSE;
-	} else {
-		g_set_error(error,
-			    FWUPD_ERROR,
-			    FWUPD_ERROR_NOT_SUPPORTED,
-			    "device type 0x%x not supported",
-			    (guint)self->dev_type);
+	if (!fu_weida_raw_w8760_dev_reboot(self, error))
 		return FALSE;
-	}
+	fu_progress_step_done(progress);
+
 	fu_device_sleep(device, 2 * 1000);
 
 	if (!fu_device_has_flag(FU_DEVICE(self), FWUPD_DEVICE_FLAG_INTERNAL)) {
@@ -969,6 +927,7 @@ fu_weida_raw_device_init(FuWeidaRawDevice *self)
 	fu_device_add_icon(FU_DEVICE(self), "input-tablet");
 	fu_device_set_name(FU_DEVICE(self), "CoolTouch Device");
 	fu_device_set_vendor(FU_DEVICE(self), "WEIDA");
+	fu_device_set_firmware_gtype(FU_DEVICE(self), FU_TYPE_WEIDA_RAW_FIRMWARE);
 
 	fu_device_add_flag(FU_DEVICE(self), FWUPD_DEVICE_FLAG_REQUIRE_AC);
 	if (FU_DEVICE(self) != NULL) {

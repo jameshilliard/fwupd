@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 
 #[repr(u32le)]
+#[derive(ToString)]
 enum FuWeidaRawFirmwareFourcc {
     Riff = 0x46464952,
     Wif2 = 0x32464957,
