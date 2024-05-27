@@ -52,8 +52,6 @@ fu_weida_raw_firmware_parse(FuFirmware *firmware,
 					    "not FRWR or CNFG");
 			return FALSE;
 		}
-		offset += FU_WEIDA_CHUNK_WIF_SIZE;
-
 		partial_stream =
 		    fu_partial_input_stream_new(stream,
 						offset,
@@ -70,7 +68,7 @@ fu_weida_raw_firmware_parse(FuFirmware *firmware,
 			return FALSE;
 		fu_firmware_add_image(firmware, img);
 
-		offset += fu_weida_chunk_wif_get_spi_size(st_wif);
+		offset += fu_weida_chunk_wif_get_size(st_wif) + FU_WEIDA_CHUNK_WIF_OFFSET_ADDRESS;
 	}
 
 	/* success */
