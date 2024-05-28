@@ -54,7 +54,7 @@ fu_weida_raw_firmware_parse(FuFirmware *firmware,
 		}
 		partial_stream =
 		    fu_partial_input_stream_new(stream,
-						offset,
+						offset + st_wif->len,
 						fu_weida_chunk_wif_get_spi_size(st_wif),
 						error);
 		if (partial_stream == NULL)
