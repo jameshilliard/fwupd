@@ -2816,6 +2816,66 @@ fu_device_fixup_vendor_name(FuDevice *self)
 	}
 }
 
+static gchar *
+fu_device_convert_vendor(const gchar *vendor)
+{
+	struct {
+		const gchar *old;
+		const gchar *new;
+	} vendor_names[] = {
+	    {"Acer, inc.", "Acer"},
+	    {"Acer Technologies", "Acer"},
+	    {"AOC Intl", "AOC"},
+	    {"Apple Computer Inc", "Apple"},
+	    {"ASUSTeK Computer Inc.", "ASUSTeK"},
+	    {"ASUSTeK Computer INC", "ASUSTeK"},
+	    {"ASUSTeK COMPUTER INC.", "ASUSTeK"},
+	    {"BTC Korea Co., Ltd", "BTC"},
+	    {"CASIO COMPUTER CO.,LTD", "Casio"},
+	    {"CLEVO", "Clevo"},
+	    {"Eizo Nanao Corporation", "Eizo"},
+	    {"FUJITSU", "Fujitsu"},
+	    {"Fujitsu Siemens Computers GmbH", "Fujitsu Siemens"},
+	    {"Gigabyte Technology Co., Ltd.", "Gigabyte"},
+	    {"Goldstar Company Ltd", "LG"},
+	    {"GOOGLE", "Google"},
+	    {"Hewlett-Packard", "HP"},
+	    {"HP, Inc", "HP"},
+	    {"Iiyama North America", "Iiyama"},
+	    {"Intel Corporation", "Intel"},
+	    {"Intel Corporation.", "Intel"},
+	    {"Lenovo Group Limited", "Lenovo"},
+	    {"LENOVO", "Lenovo"},
+	    {"LG Electronics", "LG"},
+	    {"MARANTZ JAPAN, INC.", "Marantz"},
+	    {"Mitsubishi Electric Corporation", "Mitsubishi"},
+	    {"NIKON", "Nikon"},
+	    {"Panasonic Industry Company", "Panasonic"},
+	    {"Philips Consumer Electronics Company", "Philips"},
+	    {"Samsung Electric Company", "Samsung"},
+	    {"Samsung Electronics America", "Samsung"},
+	    {"samsung", "Samsung"},
+	    {"SAMSUNG", "Samsung"},
+	    {"Sandisk Corp", "Sandisk"},
+	    {"Sanyo Electric Co.,Ltd.", "Sanyo"},
+	    {"Sonix Technology Co.", "Sonix"},
+	    {"System manufacturer", "Unknown"},
+	    {"To Be Filled By O.E.M.", "Unknown"},
+	    {"Toshiba America Info Systems Inc", "Toshiba"},
+	    {"Toshiba Corporation", "Toshiba"},
+	    {"TOSHIBA", "Toshiba"},
+	    {"Zalman Tech Co., Ltd.", "Zalman"},
+	    {NULL, NULL},
+	};
+
+	/* correct some company names */
+	for (guint i = 0; vendor_names[i].old != NULL; i++) {
+		if (g_strcmp0(vendor, vendor_names[i].old) == 0)
+			return g_strdup(vendor_names[i].new);
+	}
+	return fu_strstrip(vendor);
+}
+
 /**
  * fu_device_set_vendor:
  * @self: a #FuDevice
@@ -2832,7 +2892,7 @@ fu_device_set_vendor(FuDevice *self, const gchar *vendor)
 
 	/* trim any leading and trailing spaces */
 	if (vendor != NULL)
-		vendor_safe = fu_strstrip(vendor);
+		vendor_safe = fu_device_convert_vendor(vendor);
 
 	/* proxy */
 	fwupd_device_set_vendor(FWUPD_DEVICE(self), vendor_safe);

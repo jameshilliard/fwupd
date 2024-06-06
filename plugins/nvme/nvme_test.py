@@ -195,7 +195,7 @@ A: vendor=0x1022
                 | Fwupd.DeviceFlags.USABLE_DURING_UPDATE,
             )
             self.assertEqual(dev.get_name(), "WD PC SN740 SDDPNQD-256G")
-            self.assertEqual(dev.get_vendor(), "Sandisk Corp")
+            self.assertEqual(dev.get_vendor(), "Sandisk")
             self.assertEqual(dev.get_version(), "73110000")
             self.assertEqual(dev.get_serial(), "223361440214")
             guids = dev.get_guids()
