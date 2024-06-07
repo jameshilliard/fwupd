@@ -59,7 +59,9 @@ fu_thunderbolt_retimer_set_parent_port_offline(FuDevice *device, GError **error)
 	g_autoptr(FuUdevDevice) parent = fu_thunderbolt_retimer_get_udev_grandparent(device, error);
 	if (parent == NULL)
 		return FALSE;
-	return fu_thunderbolt_udev_set_port_offline(parent, error);
+	if (!fu_thunderbolt_udev_set_port_offline(parent, error))
+		return FALSE;
+	return fu_thunderbolt_udev_rescan_port(parent, error);
 }
 
 gboolean
@@ -94,6 +96,30 @@ fu_thunderbolt_retimer_reload(FuDevice *device, GError **error)
 		return FALSE;
 
 	/* success */
+	return TRUE;
+}
+
+static gboolean
+fu_thunderbolt_retimer_attach(FuDevice *device, FuProgress *progress, GError **error)
+{
+	/* FuThunderboltDevice->attach for nvm_authenticate */
+	if (!FU_DEVICE_CLASS(fu_thunderbolt_retimer_parent_class)->attach(device, progress, error))
+		return FALSE;
+
+	/* online */
+	fu_device_sleep(device, FU_THUNDERBOLT_RETIMER_CLEANUP_DELAY);
+	if (!fu_thunderbolt_retimer_set_parent_port_online(device, error))
+		return FALSE;
+
+	/* retimer gets removed, which we ignore, due to no-auto-remove */
+	fu_device_sleep(device, 1000);
+
+	/* get the new retimer firmware version by rescanning */
+	if (!fu_thunderbolt_retimer_set_parent_port_offline(device, error))
+		return FALSE;
+
+	/* wait for it to re-appear */
+	fu_device_add_flag(device, FWUPD_DEVICE_FLAG_WAIT_FOR_REPLUG);
 	return TRUE;
 }
 
@@ -162,6 +188,7 @@ static void
 fu_thunderbolt_retimer_class_init(FuThunderboltRetimerClass *klass)
 {
 	FuDeviceClass *device_class = FU_DEVICE_CLASS(klass);
+	device_class->attach = fu_thunderbolt_retimer_attach;
 	device_class->setup = fu_thunderbolt_retimer_setup;
 	device_class->reload = fu_thunderbolt_retimer_reload;
 	device_class->probe = fu_thunderbolt_retimer_probe;

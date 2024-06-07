@@ -71,6 +71,25 @@ is onlined with `echo 0 > offline`.
 When the controller is offlined (perhaps after enumeration), the retimer device will disappear
 from sysfs which is why the device flag `no-auto-remove` is required.
 
+A further complication is that we need to re-start the retimer to get the new version number,
+for example:
+
+    1->offline
+    ->write_firmware()
+    0->offline ()
+    ...
+    retimer gets removed, which we ignore, due to no-auto-remove
+    ...
+    1->offline
+    1->rescan
+    ...
+    retimer gets added
+    ...
+    1->online
+    ...
+    retimer gets removed, which we ignore again
+    ...
+
 ## Vendor ID Security
 
 The vendor ID is set from the udev vendor, for example set to `TBT:0x$(vid)`
