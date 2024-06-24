@@ -8322,8 +8322,10 @@ fu_engine_load(FuEngine *self, FuEngineLoadFlags flags, FuProgress *progress, GE
 	/* on a read-only filesystem don't care about the cache GUID */
 	if (flags & FU_ENGINE_LOAD_FLAG_READONLY)
 		quirks_flags |= FU_QUIRKS_LOAD_FLAG_READONLY_FS;
-	if (flags & FU_ENGINE_LOAD_FLAG_NO_CACHE)
+	if (flags & FU_ENGINE_LOAD_FLAG_NO_CACHE) {
 		quirks_flags |= FU_QUIRKS_LOAD_FLAG_NO_CACHE;
+		quirks_flags |= FU_QUIRKS_LOAD_FLAG_NO_SQLITE;
+	}
 	if (!fu_context_load_quirks(self->ctx, quirks_flags, &error_quirks))
 		g_warning("Failed to load quirks: %s", error_quirks->message);
 	fu_progress_step_done(progress);

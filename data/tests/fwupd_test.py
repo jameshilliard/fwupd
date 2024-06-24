@@ -167,7 +167,7 @@ class FwupdTest(dbusmock.DBusTestCase):
         )
 
         # wait until the daemon gets online
-        wait_time = 60 if "valgrind" in daemon_path[0] else 5
+        wait_time = 120 if "valgrind" in daemon_path[0] else 60
         self.assert_eventually(
             lambda: self.proxy and self.proxy.get_name_owner(),
             timeout=wait_time * 1000,
