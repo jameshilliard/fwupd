@@ -128,6 +128,14 @@ typedef enum {
 #define FU_DEVICE_REMOVE_DELAY_USER_REPLUG 40000 /* ms */
 
 /**
+ * FU_DEVICE_INHIBIT_ID_GUID:
+ *
+ * The inhibit ID for a device that should not be enumerated due to another device needing
+ * exclusive hardware access.
+ */
+#define FU_DEVICE_INHIBIT_ID_GUID "guid"
+
+/**
  * FuDeviceRetryFunc:
  * @self: a #FuDevice
  * @user_data: (closure): user data
@@ -929,3 +937,8 @@ fu_device_build_instance_id_full(FuDevice *self,
 				 ...) G_GNUC_NULL_TERMINATED G_GNUC_NON_NULL(1, 4);
 FuDeviceLocker *
 fu_device_poll_locker_new(FuDevice *self, GError **error) G_GNUC_NON_NULL(1);
+
+void
+fu_device_add_inhibit_guid(FuDevice *self, const gchar *guid) G_GNUC_NON_NULL(1, 2);
+GPtrArray *
+fu_device_get_inhibit_guids(FuDevice *self) G_GNUC_NON_NULL(1);

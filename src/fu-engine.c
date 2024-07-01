@@ -3310,6 +3310,66 @@ fu_engine_reload(FuEngine *self, const gchar *device_id, GError **error)
 }
 
 static gboolean
+fu_engine_inhibit_device_guids(FuEngine *self, const gchar *device_id, GError **error)
+{
+	GPtrArray *inhibit_guids;
+	g_autoptr(FuDevice) device = NULL;
+
+	/* the device and plugin both may have changed */
+	device = fu_engine_get_device(self, device_id, error);
+	if (device == NULL) {
+		g_prefix_error(error, "failed to get device to inhibit GUIDs: ");
+		return FALSE;
+	}
+	inhibit_guids = fu_device_get_inhibit_guids(device);
+	for (guint i = 0; inhibit_guids != NULL && i < inhibit_guids->len; i++) {
+		const gchar *guid = g_ptr_array_index(inhibit_guids, i);
+		g_autoptr(FuDevice) device_tmp =
+		    fu_device_list_get_by_guid(self->device_list, guid, NULL);
+		if (device_tmp != NULL) {
+			g_autofree gchar *reason =
+			    g_strdup_printf("inhibited by %s", fu_device_get_id(device));
+			g_debug("inhibiting %s [%s]",
+				fu_device_get_name(device),
+				fu_device_get_id(device));
+			fu_device_inhibit(device_tmp, FU_DEVICE_INHIBIT_ID_GUID, reason);
+		}
+	}
+
+	/* success */
+	return TRUE;
+}
+
+static gboolean
+fu_engine_uninhibit_device_guids(FuEngine *self, const gchar *device_id, GError **error)
+{
+	GPtrArray *inhibit_guids;
+	g_autoptr(FuDevice) device = NULL;
+
+	/* the device and plugin both may have changed */
+	device = fu_engine_get_device(self, device_id, error);
+	if (device == NULL) {
+		g_prefix_error(error, "failed to get device to uninhibit GUIDs: ");
+		return FALSE;
+	}
+	inhibit_guids = fu_device_get_inhibit_guids(device);
+	for (guint i = 0; inhibit_guids != NULL && i < inhibit_guids->len; i++) {
+		const gchar *guid = g_ptr_array_index(inhibit_guids, i);
+		g_autoptr(FuDevice) device_tmp =
+		    fu_device_list_get_by_guid(self->device_list, guid, NULL);
+		if (device_tmp != NULL) {
+			g_debug("uninhibiting %s [%s]",
+				fu_device_get_name(device),
+				fu_device_get_id(device));
+			fu_device_uninhibit(device_tmp, FU_DEVICE_INHIBIT_ID_GUID);
+		}
+	}
+
+	/* success */
+	return TRUE;
+}
+
+static gboolean
 fu_engine_write_firmware(FuEngine *self,
 			 const gchar *device_id,
 			 GInputStream *stream_fw,
@@ -3538,6 +3598,10 @@ fu_engine_install_blob(FuEngine *self,
 			return FALSE;
 		}
 
+		/* inhibit other devices */
+		if (!fu_engine_inhibit_device_guids(self, device_id, error))
+			return FALSE;
+
 		/* detach to bootloader mode */
 		fu_engine_set_install_phase(self, FU_ENGINE_INSTALL_PHASE_DETACH);
 		if (!fu_engine_detach(self,
@@ -3558,6 +3622,10 @@ fu_engine_install_blob(FuEngine *self,
 					      error))
 			return FALSE;
 		fu_progress_step_done(progress_local);
+
+		/* uninhibit other devices */
+		if (!fu_engine_uninhibit_device_guids(self, device_id, error))
+			return FALSE;
 
 		/* attach into runtime mode */
 		fu_engine_set_install_phase(self, FU_ENGINE_INSTALL_PHASE_ATTACH);
