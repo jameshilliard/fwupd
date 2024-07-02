@@ -165,10 +165,10 @@ fu_usb_backend_device_notify_flags_cb(FuDevice *device, GParamSpec *pspec, FuBac
 	if (fu_device_has_flag(device, FWUPD_DEVICE_FLAG_WAIT_FOR_REPLUG)) {
 		g_debug("setting USB poll interval to %ums to detect replug",
 			(guint)FU_USB_BACKEND_POLL_INTERVAL_WAIT_REPLUG);
-		fu_usb_backend_set_hotplug_poll_interval(self->usb_ctx,
+		fu_usb_backend_set_hotplug_poll_interval(self,
 							 FU_USB_BACKEND_POLL_INTERVAL_WAIT_REPLUG);
 	} else {
-		fu_usb_backend_set_hotplug_poll_interval(self->usb_ctx,
+		fu_usb_backend_set_hotplug_poll_interval(self,
 							 FU_USB_BACKEND_POLL_INTERVAL_DEFAULT);
 	}
 }
