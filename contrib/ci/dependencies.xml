@@ -864,7 +864,7 @@
       <package variant="x86_64" />
     </distro>
   </dependency>
-  <dependency id="libusb-dev">
+  <dependency id="libusb-1.0-0-dev">
     <distro id="arch">
       <package variant="x86_64">libusb</package>
     </distro>
@@ -887,7 +887,7 @@
         <version>(>= 1.0.9)</version>
       </control>
       <package variant="x86_64" />
-      <package variant="s390x">libusb-dev:s390x</package>
+      <package variant="s390x">libusb-1.0-0-dev:s390x</package>
       <package variant="i386" />
     </distro>
     <distro id="ubuntu">
