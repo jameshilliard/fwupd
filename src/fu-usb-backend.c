@@ -85,6 +85,10 @@ fu_usb_backend_rescan(FuUsbBackend *self)
 	g_autoptr(GList) existing_devices = NULL;
 	g_autoptr(GPtrArray) devices = fu_backend_get_devices(FU_BACKEND(self));
 
+	/* skip actual enumeration */
+	if (g_getenv("FWUPD_SELF_TEST") != NULL)
+		return;
+
 	/* copy to a context so we can remove from the array */
 	for (guint i = 0; i < devices->len; i++) {
 		FuUsbDevice *device = g_ptr_array_index(devices, i);
@@ -161,10 +165,10 @@ fu_usb_backend_device_notify_flags_cb(FuDevice *device, GParamSpec *pspec, FuBac
 	if (fu_device_has_flag(device, FWUPD_DEVICE_FLAG_WAIT_FOR_REPLUG)) {
 		g_debug("setting USB poll interval to %ums to detect replug",
 			(guint)FU_USB_BACKEND_POLL_INTERVAL_WAIT_REPLUG);
-		fu_usb_context_set_hotplug_poll_interval(self->usb_ctx,
+		fu_usb_backend_set_hotplug_poll_interval(self->usb_ctx,
 							 FU_USB_BACKEND_POLL_INTERVAL_WAIT_REPLUG);
 	} else {
-		fu_usb_context_set_hotplug_poll_interval(self->usb_ctx,
+		fu_usb_backend_set_hotplug_poll_interval(self->usb_ctx,
 							 FU_USB_BACKEND_POLL_INTERVAL_DEFAULT);
 	}
 }
@@ -324,51 +328,6 @@ fu_usb_backend_coldplug(FuBackend *backend, FuProgress *progress, GError **error
 	return TRUE;
 }
 
-#if 0
-static gboolean
-fu_usb_backend_load(FuBackend *backend,
-		    JsonObject *json_object,
-		    const gchar *tag,
-		    FuBackendLoadFlags flags,
-		    GError **error)
-{
-	FuUsbBackend *self = FU_USB_BACKEND(backend);
-	return fu_usb_context_load_with_tag(self->usb_ctx, json_object, tag, error);
-}
-
-static gboolean
-fu_usb_backend_save(FuBackend *backend,
-		    JsonBuilder *json_builder,
-		    const gchar *tag,
-		    FuBackendSaveFlags flags,
-		    GError **error)
-{
-	FuUsbBackend *self = FU_USB_BACKEND(backend);
-	guint usb_events_cnt = 0;
-	g_autoptr(GPtrArray) devices = fu_usb_context_get_devices(self->usb_ctx);
-
-	for (guint i = 0; i < devices->len; i++) {
-		FuUsbDevice *usb_device = g_ptr_array_index(devices, i);
-		g_autoptr(GPtrArray) usb_events = fu_device_get_events(usb_device);
-		if (usb_events->len > 0 || fu_usb_device_has_tag(usb_device, tag)) {
-			g_info("%u USB events to save for %s",
-			       usb_events->len,
-//			       fu_usb_device_get_platform_id(usb_device));
-		}
-		usb_events_cnt += usb_events->len;
-	}
-	if (usb_events_cnt == 0)
-		return TRUE;
-	if (!fu_usb_context_save_with_tag(self->usb_ctx, json_builder, tag, error))
-		return FALSE;
-	for (guint i = 0; i < devices->len; i++) {
-		FuUsbDevice *usb_device = g_ptr_array_index(devices, i);
-		fu_device_clear_events(FU_DEVICE(usb_device));
-	}
-	return TRUE;
-}
-#endif
-
 static void
 fu_usb_backend_registered(FuBackend *backend, FuDevice *device)
 {
@@ -432,8 +391,6 @@ fu_usb_backend_class_init(FuUsbBackendClass *klass)
 	object_class->finalize = fu_usb_backend_finalize;
 	backend_class->setup = fu_usb_backend_setup;
 	backend_class->coldplug = fu_usb_backend_coldplug;
-	//	backend_class->load = fu_usb_backend_load;
-	//	backend_class->save = fu_usb_backend_save;
 	backend_class->registered = fu_usb_backend_registered;
 }
 

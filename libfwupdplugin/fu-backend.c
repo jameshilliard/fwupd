@@ -254,24 +254,19 @@ fu_backend_get_emulation_array_member_name(FuBackend *self)
  * fu_backend_load:
  * @self: a #FuBackend
  * @json_object: a #JsonObject
- * @tag: a string backend tag, or %NULL
- * @flags: %FuBackendLoadFlags, typically `FU_BACKEND_LOAD_FLAG_NONE`
  * @error: (nullable): optional return location for an error
  *
  * Loads the backend from a JSON object.
  *
  * Returns: %TRUE for success
  *
- * Since: 1.8.5
+ * Since: 2.0.0
  **/
 gboolean
 fu_backend_load(FuBackend *self,
 		JsonObject *json_object,
-		const gchar *tag,
-		FuBackendLoadFlags flags,
 		GError **error)
 {
-	FuBackendClass *klass = FU_BACKEND_GET_CLASS(self);
 	FuBackendPrivate *priv = GET_PRIVATE(self);
 	JsonArray *json_array;
 	g_autofree gchar *list_name = NULL;
@@ -284,10 +279,6 @@ fu_backend_load(FuBackend *self,
 	g_return_val_if_fail(FU_IS_BACKEND(self), FALSE);
 	g_return_val_if_fail(json_object != NULL, FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-
-	/* optional */
-	if (klass->load != NULL)
-		return klass->load(self, json_object, tag, flags, error);
 
 	/* sanity check */
 	list_name = fu_backend_get_emulation_array_member_name(self);
@@ -356,31 +347,21 @@ fu_backend_load(FuBackend *self,
  * fu_backend_save:
  * @self: a #FuBackend
  * @json_builder: a #JsonBuilder
- * @tag: a string backend tag, or %NULL
- * @flags: %FuBackendSaveFlags, typically `FU_BACKEND_SAVE_FLAG_NONE`
  * @error: (nullable): optional return location for an error
  *
  * Saves the backend to a JSON builder.
  *
  * Returns: %TRUE for success
  *
- * Since: 1.8.5
+ * Since: 2.0.0
  **/
 gboolean
 fu_backend_save(FuBackend *self,
 		JsonBuilder *json_builder,
-		const gchar *tag,
-		FuBackendSaveFlags flags,
 		GError **error)
 {
-	FuBackendClass *klass = FU_BACKEND_GET_CLASS(self);
-
 	g_return_val_if_fail(FU_IS_BACKEND(self), FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-
-	/* optional */
-	if (klass->save != NULL)
-		return klass->save(self, json_builder, tag, flags, error);
 
 	/* internal */
 	json_builder_begin_object(json_builder);

@@ -2679,8 +2679,6 @@ fu_engine_emulation_load_json(FuEngine *self, const gchar *json, GError **error)
 		FuBackend *backend = g_ptr_array_index(self->backends, i);
 		if (!fu_backend_load(backend,
 				     json_node_get_object(root),
-				     NULL,
-				     FU_BACKEND_LOAD_FLAG_NONE,
 				     error))
 			return FALSE;
 	}
@@ -2833,7 +2831,7 @@ fu_engine_backends_save_phase(FuEngine *self, GError **error)
 	/* all devices in all backends */
 	for (guint i = 0; i < self->backends->len; i++) {
 		FuBackend *backend = g_ptr_array_index(self->backends, i);
-		if (!fu_backend_save(backend, json_builder, NULL, FU_BACKEND_SAVE_FLAG_NONE, error))
+		if (!fu_backend_save(backend, json_builder, error))
 			return FALSE;
 	}
 	json_root = json_builder_get_root(json_builder);
@@ -8856,6 +8854,9 @@ fu_engine_constructed(GObject *obj)
 #endif
 
 	fu_context_add_compile_version(self->ctx, "org.freedesktop.fwupd", VERSION);
+#ifdef HAVE_LIBUSB
+	fu_context_add_compile_version(self->ctx, "info.libusb", LIBUSB_VERSION);
+#endif
 #ifdef HAVE_PASSIM
 	{
 		g_autofree gchar *version = g_strdup_printf("%i.%i.%i",

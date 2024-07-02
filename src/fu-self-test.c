@@ -4033,8 +4033,6 @@ fu_backend_usb_load_file(FuBackend *backend, const gchar *fn)
 	g_assert_true(ret);
 	ret = fu_backend_load(backend,
 			      json_node_get_object(json_parser_get_root(parser)),
-			      NULL,
-			      FU_BACKEND_LOAD_FLAG_NONE,
 			      &error);
 	g_assert_no_error(error);
 	g_assert_true(ret);
@@ -4097,16 +4095,20 @@ fu_backend_usb_func(gconstpointer user_data)
 	g_assert_cmpstr(fu_backend_get_name(backend), ==, "usb");
 	g_assert_true(fu_backend_get_enabled(backend));
 	ret = fu_backend_setup(backend, progress, &error);
+	g_assert_cmpint(cnt_added, ==, 0);
+	g_assert_cmpint(cnt_removed, ==, 0);
 	g_assert_no_error(error);
 	g_assert_true(ret);
-	usb_emulate_fn = g_test_build_filename(G_TEST_DIST, "tests", "usb-devices.json", NULL);
-	g_assert_nonnull(usb_emulate_fn);
-	fu_backend_usb_load_file(backend, usb_emulate_fn);
 	g_assert_cmpint(cnt_added, ==, 0);
 	g_assert_cmpint(cnt_removed, ==, 0);
 	ret = fu_backend_coldplug(backend, progress, &error);
 	g_assert_no_error(error);
 	g_assert_true(ret);
+	g_assert_cmpint(cnt_added, ==, 0);
+	g_assert_cmpint(cnt_removed, ==, 0);
+	usb_emulate_fn = g_test_build_filename(G_TEST_DIST, "tests", "usb-devices.json", NULL);
+	g_assert_nonnull(usb_emulate_fn);
+	fu_backend_usb_load_file(backend, usb_emulate_fn);
 	g_assert_cmpint(cnt_added, ==, 1);
 	g_assert_cmpint(cnt_removed, ==, 0);
 	devices = fu_backend_get_devices(backend);
@@ -4143,6 +4145,8 @@ fu_backend_usb_func(gconstpointer user_data)
 	fu_backend_usb_load_file(backend, usb_emulate_fn3);
 	g_assert_cmpint(cnt_added, ==, 2);
 	g_assert_cmpint(cnt_removed, ==, 1);
+#else
+	g_test_skip("No GUsb support");
 #endif
 }
 
@@ -4172,8 +4176,6 @@ fu_backend_usb_invalid_func(gconstpointer user_data)
 	g_assert_true(ret);
 	ret = fu_backend_load(backend,
 			      json_node_get_object(json_parser_get_root(parser)),
-			      NULL,
-			      FU_BACKEND_LOAD_FLAG_NONE,
 			      &error);
 	g_assert_no_error(error);
 	g_assert_true(ret);
@@ -4203,6 +4205,8 @@ fu_backend_usb_invalid_func(gconstpointer user_data)
 
 	/* check the fwupd DS20 descriptor was *not* parsed */
 	g_assert_false(fu_device_has_icon(device_tmp, "computer"));
+#else
+	g_test_skip("No GUsb support");
 #endif
 }
 

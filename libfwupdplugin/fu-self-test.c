@@ -2172,7 +2172,7 @@ fu_backend_load_json(FuBackend *backend, const gchar *json, GError **error)
 	if (!json_parser_load_from_data(parser, json, -1, error))
 		return FALSE;
 	json_obj = json_node_get_object(json_parser_get_root(parser));
-	return fu_backend_load(backend, json_obj, "emulation", FU_BACKEND_LOAD_FLAG_NONE, error);
+	return fu_backend_load(backend, json_obj, error);
 }
 
 static void

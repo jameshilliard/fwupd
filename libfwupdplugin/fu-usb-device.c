@@ -68,60 +68,6 @@ enum { PROP_0, PROP_LIBUSB_DEVICE, PROP_LAST };
 #define FU_USB_DEVICE_CLAIM_INTERFACE_DELAY 500 /* ms */
 #define FU_USB_DEVICE_OPEN_DELAY	    50	/* ms */
 
-#if 0
-static gboolean
-fu_usb_device_libusb_status_to_gerror(gint status, GError **error)
-{
-	gboolean ret = FALSE;
-
-	switch (status) {
-	case LIBUSB_TRANSFER_COMPLETED:
-		ret = TRUE;
-		break;
-	case LIBUSB_TRANSFER_ERROR:
-		g_set_error_literal(error, FWUPD_ERROR, FWUPD_ERROR_INTERNAL, "transfer failed");
-		break;
-	case LIBUSB_TRANSFER_TIMED_OUT:
-		g_set_error_literal(error,
-				    FWUPD_ERROR,
-				    FWUPD_ERROR_TIMED_OUT,
-				    "transfer timed out");
-		break;
-	case LIBUSB_TRANSFER_CANCELLED:
-		g_set_error_literal(error,
-				    FWUPD_ERROR,
-				    FWUPD_ERROR_CANCELLED,
-				    "transfer cancelled");
-		break;
-	case LIBUSB_TRANSFER_STALL:
-		g_set_error_literal(error,
-				    FWUPD_ERROR,
-				    FWUPD_ERROR_NOT_SUPPORTED,
-				    "endpoint stalled or request not supported");
-		break;
-	case LIBUSB_TRANSFER_NO_DEVICE:
-		g_set_error_literal(error,
-				    FWUPD_ERROR,
-				    FWUPD_ERROR_NOT_FOUND,
-				    "device was disconnected");
-		break;
-	case LIBUSB_TRANSFER_OVERFLOW:
-		g_set_error_literal(error,
-				    FWUPD_ERROR,
-				    FWUPD_ERROR_INTERNAL,
-				    "device sent more data than requested");
-		break;
-	default:
-		g_set_error(error,
-			    FWUPD_ERROR,
-			    FWUPD_ERROR_INTERNAL,
-			    "unknown status [%i]",
-			    status);
-	}
-	return ret;
-}
-#endif
-
 static gboolean
 fu_usb_device_libusb_error_to_gerror(FuUsbDevice *self, gint rc, GError **error)
 {
@@ -188,19 +134,11 @@ fu_usb_device_not_open_error(FuUsbDevice *self, GError **error)
 	return FALSE;
 }
 
-/**
- * fu_usb_device_invalidate:
- * @self: a #FuUsbDevice
- *
- * Invalidates the caches used in fu_usb_device_get_interfaces().
- *
- * Since: 2.0.0
- **/
 static void
-fu_usb_device_invalidate(FuUsbDevice *self)
+fu_usb_device_invalidate(FuDevice *device)
 {
+	FuUsbDevice *self = FU_USB_DEVICE(device);
 	FuUsbDevicePrivate *priv = GET_PRIVATE(self);
-	g_return_if_fail(FU_IS_USB_DEVICE(self));
 	priv->interfaces_valid = FALSE;
 	priv->bos_descriptors_valid = FALSE;
 	g_ptr_array_set_size(priv->interfaces, 0);
@@ -208,6 +146,7 @@ fu_usb_device_invalidate(FuUsbDevice *self)
 	g_ptr_array_set_size(priv->hid_descriptors, 0);
 }
 
+#if 0
 /**
  * fu_usb_device_get_configuration:
  * @self: a #FuUsbDevice
@@ -239,15 +178,14 @@ fu_usb_device_get_configuration(FuUsbDevice *self, GError **error)
 		fu_usb_device_not_open_error(self, error);
 		return -1;
 	}
-
 	rc = libusb_get_configuration(priv->handle, &config);
 	if (rc != LIBUSB_SUCCESS) {
 		fu_usb_device_libusb_error_to_gerror(self, rc, error);
 		return -1;
 	}
-
 	return config;
 }
+#endif
 
 static void
 fu_usb_device_set_dev(FuUsbDevice *self, struct libusb_device *usb_device)
@@ -742,6 +680,7 @@ fu_usb_device_get_address(FuUsbDevice *self)
 	return libusb_get_device_address(priv->device);
 }
 
+#if 0
 static guint8
 fu_usb_device_get_port_number(FuUsbDevice *self)
 {
@@ -750,6 +689,7 @@ fu_usb_device_get_port_number(FuUsbDevice *self)
 		return 0x0;
 	return libusb_get_port_number(priv->device);
 }
+#endif
 
 static guint8
 fu_usb_device_get_manufacturer_index(FuUsbDevice *self)
@@ -811,15 +751,10 @@ static gboolean
 fu_usb_device_setup(FuDevice *device, GError **error)
 {
 	FuUsbDevice *self = FU_USB_DEVICE(device);
-	FuUsbDevicePrivate *priv = GET_PRIVATE(self);
 	guint idx;
 
 	g_return_val_if_fail(FU_IS_USB_DEVICE(self), FALSE);
 	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-
-	/* self tests */
-	if (priv->device == NULL)
-		return TRUE;
 
 	/* get vendor */
 	if (fu_device_get_vendor(device) == NULL) {
@@ -889,12 +824,7 @@ static gboolean
 fu_usb_device_ready(FuDevice *device, GError **error)
 {
 	FuUsbDevice *self = FU_USB_DEVICE(device);
-	FuUsbDevicePrivate *priv = GET_PRIVATE(self);
 	g_autoptr(GPtrArray) intfs = NULL;
-
-	/* self tests */
-	if (priv->device == NULL)
-		return TRUE;
 
 	/* get the interface GUIDs */
 	intfs = fu_usb_device_get_interfaces(self, error);
@@ -1139,39 +1069,28 @@ fu_usb_device_probe(FuDevice *device, GError **error)
 	FuUsbDevicePrivate *priv = GET_PRIVATE(self);
 	gint rc;
 	guint16 release;
-	g_autofree gchar *platform_id = NULL;
-	g_autofree gchar *platform_id_tmp = NULL;
 	g_autofree gchar *vendor_id = NULL;
 	g_autoptr(GError) error_bos = NULL;
 	g_autoptr(GPtrArray) intfs = NULL;
 
-	/* self tests */
-	if (priv->device == NULL)
-		return TRUE;
-
-	// FIXME TRUE?
-	if (fu_device_has_flag(FU_DEVICE(self), FWUPD_DEVICE_FLAG_EMULATED)) {
-		g_set_error_literal(error,
+	/* open not required to get the descriptor */
+	if (priv->device != NULL) {
+		rc = libusb_get_device_descriptor(priv->device, &priv->desc);
+		if (rc != LIBUSB_SUCCESS) {
+			g_set_error(error,
 				    FWUPD_ERROR,
 				    FWUPD_ERROR_INTERNAL,
-				    "Constructed without a libusb_device");
-		return FALSE;
-	}
-
-	/* open not required to get the descriptor */
-	rc = libusb_get_device_descriptor(priv->device, &priv->desc);
-	if (rc != LIBUSB_SUCCESS) {
-		g_set_error(error,
-			    FWUPD_ERROR,
-			    FWUPD_ERROR_INTERNAL,
-			    "Failed to get USB descriptor for device: %s",
-			    libusb_strerror(rc));
-		return FALSE;
+				    "Failed to get USB descriptor for device: %s",
+				    libusb_strerror(rc));
+			return FALSE;
+		}
 	}
 
 	/* this does not change on plug->unplug->plug */
-	platform_id = fu_usb_device_build_physical_id(priv->device);
-	fu_device_set_physical_id(device, platform_id);
+	if (priv->device != NULL) {
+		g_autofree gchar *platform_id = fu_usb_device_build_physical_id(priv->device);
+		fu_device_set_physical_id(device, platform_id);
+	}
 
 	/* set vendor ID */
 	vendor_id = g_strdup_printf("USB:0x%04X", fu_usb_device_get_vid(self));
@@ -1256,15 +1175,17 @@ fu_usb_device_probe(FuDevice *device, GError **error)
 	}
 
 	/* add 2 levels of parent IDs */
-	platform_id_tmp = g_strdup(platform_id);
-	for (guint i = 0; i < 2; i++) {
-		gchar *tok = g_strrstr(platform_id_tmp, ":");
-		if (tok == NULL)
-			break;
-		*tok = '\0';
-		if (g_strcmp0(platform_id_tmp, "usb") == 0)
-			break;
-		fu_device_add_parent_physical_id(device, platform_id_tmp);
+	if (fu_device_get_physical_id(device) != NULL) {
+		g_autofree gchar *platform_id_tmp = g_strdup(fu_device_get_physical_id(device));
+		for (guint i = 0; i < 2; i++) {
+			gchar *tok = g_strrstr(platform_id_tmp, ":");
+			if (tok == NULL)
+				break;
+			*tok = '\0';
+			if (g_strcmp0(platform_id_tmp, "usb") == 0)
+				break;
+			fu_device_add_parent_physical_id(device, platform_id_tmp);
+		}
 	}
 
 	/* parse the platform capability BOS descriptors for quirks */
@@ -1371,6 +1292,7 @@ fu_usb_device_get_device_class(FuUsbDevice *self)
 	return priv->desc.bDeviceClass;
 }
 
+#if 0
 /**
  * fu_usb_device_get_device_subclass:
  * @self: a #FuUsbDevice
@@ -1408,6 +1330,7 @@ fu_usb_device_get_device_protocol(FuUsbDevice *self)
 	g_return_val_if_fail(FU_IS_USB_DEVICE(self), 0);
 	return priv->desc.bDeviceProtocol;
 }
+#endif
 
 /**
  * fu_usb_device_find_udev_device:
@@ -1592,8 +1515,10 @@ fu_usb_device_control_transfer(FuUsbDevice *self,
 		if (event == NULL)
 			return FALSE;
 		rc_tmp = fu_device_event_get_i64(event, "Error", NULL);
-		if (rc_tmp != G_MAXINT)
+		if (rc_tmp != G_MAXINT64)
 			return fu_usb_device_libusb_error_to_gerror(self, rc_tmp, error);
+		if (actual_length != NULL)
+			*actual_length = length;
 		return fu_device_event_copy_data(event, "Data", data, length, error);
 	}
 
@@ -1702,8 +1627,10 @@ fu_usb_device_bulk_transfer(FuUsbDevice *self,
 		if (event == NULL)
 			return FALSE;
 		rc_tmp = fu_device_event_get_i64(event, "Error", NULL);
-		if (rc_tmp != G_MAXINT)
+		if (rc_tmp != G_MAXINT64)
 			return fu_usb_device_libusb_error_to_gerror(self, rc_tmp, error);
+		if (actual_length != NULL)
+			*actual_length = length;
 		return fu_device_event_copy_data(event, "Data", data, length, error);
 	}
 
@@ -1790,8 +1717,10 @@ fu_usb_device_interrupt_transfer(FuUsbDevice *self,
 		if (event == NULL)
 			return FALSE;
 		rc_tmp = fu_device_event_get_i64(event, "Error", NULL);
-		if (rc_tmp != G_MAXINT)
+		if (rc_tmp != G_MAXINT64)
 			return fu_usb_device_libusb_error_to_gerror(self, rc_tmp, error);
+		if (actual_length != NULL)
+			*actual_length = length;
 		return fu_device_event_copy_data(event, "Data", data, length, error);
 	}
 
@@ -1864,15 +1793,9 @@ fu_usb_device_ensure_interfaces(FuUsbDevice *self, GError **error)
 	struct libusb_config_descriptor *config;
 
 	/* sanity check */
-	if (fu_device_has_flag(FU_DEVICE(self), FWUPD_DEVICE_FLAG_EMULATED)) {
-		g_set_error_literal(error,
-				    FWUPD_ERROR,
-				    FWUPD_ERROR_NOT_SUPPORTED,
-				    "not supported for emulated device");
-		return FALSE;
-	}
-
 	if (priv->interfaces_valid)
+		return TRUE;
+	if (priv->device == NULL)
 		return TRUE;
 
 	rc = libusb_get_active_config_descriptor(priv->device, &config);
@@ -2378,7 +2301,7 @@ fu_usb_device_get_custom_index(FuUsbDevice *self,
 		if (event == NULL)
 			return 0x00;
 		rc_tmp = fu_device_event_get_i64(event, "Error", NULL);
-		if (rc_tmp != G_MAXINT)
+		if (rc_tmp != G_MAXINT64)
 			return fu_usb_device_libusb_error_to_gerror(self, rc_tmp, error);
 		bytes = fu_device_event_get_bytes(event, "Data", error);
 		if (bytes == NULL)
@@ -2641,7 +2564,7 @@ fu_usb_device_from_json(FwupdCodec *codec, JsonNode *json_node, GError **error)
 	/* optional properties */
 	tmp = json_object_get_string_member_with_default(json_object, "PlatformId", NULL);
 	if (tmp != NULL)
-		fu_device_set_backend_id(FU_DEVICE(self), tmp);
+		fu_device_set_physical_id(FU_DEVICE(self), tmp);
 	tmp = json_object_get_string_member_with_default(json_object, "Created", NULL);
 	if (tmp != NULL) {
 		g_autoptr(GDateTime) created_new = g_date_time_new_from_iso8601(tmp, NULL);
@@ -2747,9 +2670,9 @@ fu_usb_device_add_json(FwupdCodec *codec, JsonBuilder *builder, FwupdCodecFlags 
 	g_autoptr(GError) error_interfaces = NULL;
 
 	/* optional properties */
-	if (fu_device_get_backend_id(FU_DEVICE(self)) != NULL) {
+	if (fu_device_get_physical_id(FU_DEVICE(self)) != NULL) {
 		json_builder_set_member_name(builder, "PlatformId");
-		json_builder_add_string_value(builder, fu_device_get_backend_id(FU_DEVICE(self)));
+		json_builder_add_string_value(builder, fu_device_get_physical_id(FU_DEVICE(self)));
 	}
 #if GLIB_CHECK_VERSION(2, 62, 0)
 	if (fu_device_get_created(FU_DEVICE(self)) != 0) {
@@ -2975,6 +2898,7 @@ fu_usb_device_class_init(FuUsbDeviceClass *klass)
 	device_class->ready = fu_usb_device_ready;
 	device_class->close = fu_usb_device_close;
 	device_class->probe = fu_usb_device_probe;
+	device_class->invalidate = fu_usb_device_invalidate;
 	device_class->to_string = fu_usb_device_to_string;
 	device_class->incorporate = fu_usb_device_incorporate;
 	device_class->bind_driver = fu_udev_device_bind_driver;
