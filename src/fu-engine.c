@@ -2831,8 +2831,9 @@ fu_engine_backends_save_phase(FuEngine *self, GError **error)
 	/* all devices in all backends */
 	for (guint i = 0; i < self->backends->len; i++) {
 		FuBackend *backend = g_ptr_array_index(self->backends, i);
-		if (!fu_backend_save(backend, json_builder, error))
-			return FALSE;
+		json_builder_begin_object(json_builder);
+		fwupd_codec_to_json(FWUPD_CODEC(backend), json_builder, FWUPD_CODEC_FLAG_NONE);
+		json_builder_end_object(json_builder);
 	}
 	json_root = json_builder_get_root(json_builder);
 	json_generator = json_generator_new();

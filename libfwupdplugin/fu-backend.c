@@ -343,33 +343,6 @@ fu_backend_load(FuBackend *self,
 	return TRUE;
 }
 
-/**
- * fu_backend_save:
- * @self: a #FuBackend
- * @json_builder: a #JsonBuilder
- * @error: (nullable): optional return location for an error
- *
- * Saves the backend to a JSON builder.
- *
- * Returns: %TRUE for success
- *
- * Since: 2.0.0
- **/
-gboolean
-fu_backend_save(FuBackend *self,
-		JsonBuilder *json_builder,
-		GError **error)
-{
-	g_return_val_if_fail(FU_IS_BACKEND(self), FALSE);
-	g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-
-	/* internal */
-	json_builder_begin_object(json_builder);
-	fwupd_codec_to_json(FWUPD_CODEC(self), json_builder, FWUPD_CODEC_FLAG_NONE);
-	json_builder_end_object(json_builder);
-	return TRUE;
-}
-
 static void
 fu_backend_add_json(FwupdCodec *codec, JsonBuilder *builder, FwupdCodecFlags flags)
 {

@@ -12,7 +12,3 @@ gboolean
 fu_backend_load(FuBackend *self,
 		JsonObject *json_object,
 		GError **error) G_GNUC_NON_NULL(1, 2);
-gboolean
-fu_backend_save(FuBackend *self,
-		JsonBuilder *json_builder,
-		GError **error) G_GNUC_NON_NULL(1, 2);
